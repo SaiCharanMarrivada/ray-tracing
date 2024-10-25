@@ -1,5 +1,4 @@
 using StaticArrays
-using ProgressBars
 using LinearAlgebra
 
 
@@ -19,14 +18,28 @@ function surrounds(x::T, interval::Interval{T}) where {T}
     return (x > interval.xmin) && (x < interval.xmax)
 end
 
+function clamp(x::T, interval::Interval{T}) where {T}
+    if x < interval.xmin
+        return interval.xmin
+    elseif x > interval.xmax
+        return interval.xmax
+    else
+        return x
+    end
+end
+
 Base.length(interval::Interval{T}) where {T} = interval.xmax - interval.xmin
 
 const Point3{T} = SVector{3,T}
 const Color = SVector{3,UInt8}
 const Vector3{T} = SVector{3,T}
 
+Color() = Color(zeros(UInt8, 3))
+
 function write_color(v::Vector3{T}) where {T}
-    println(join(Color(floor.(255.999 * v)), ' '))
+    interval = Ref(Interval{T}(0.000, 0.999))
+    color = Color(floor.(256 * clamp.(v, interval)))
+    println(join(color, ' '))
 end
 
 function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
@@ -94,7 +107,6 @@ function hit(
     if (!surrounds(root, interval))
         root = (h + sqrt(Δ)) / a
         if (!surrounds(root, interval))
-
             return false
         end
     end
@@ -143,6 +155,7 @@ end
 struct Camera{T}
     image_height::Int
     image_width::Int
+    samples_per_pixel::Int
     aspect_ratio::Float64
     center::Point3{T}
     pixel00::Point3{T}
@@ -150,7 +163,7 @@ struct Camera{T}
     Δv::Vector3{T}
 end
 
-function Camera(image_width::Int, aspect_ratio::Float64)
+function Camera(image_width::Int, aspect_ratio::Float64; samples_per_pixel = 100)
     image_height = Int(floor(image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
 
@@ -171,23 +184,39 @@ function Camera(image_width::Int, aspect_ratio::Float64)
         (Δv / 2)
     )
 
-    return Camera(image_height, image_width, aspect_ratio, center, pixel00, Δu, Δv)
+    return Camera(
+        image_height,
+        image_width,
+        samples_per_pixel,
+        aspect_ratio,
+        center,
+        pixel00,
+        Δu,
+        Δv,
+    )
 end
 
 function render(camera::Camera, world::HittableList)
-    progress_bar = ProgressBar(0:(camera.image_height - 1))
+    # progress_bar = ProgressBar(0:(camera.image_height - 1))
 
     println("P3")
     println(camera.image_width, ' ', camera.image_height)
     println(255)
 
-    for j in progress_bar
+    for j in 0:camera.image_height - 1
+        print(stderr, "\rScanlines remaining: ", camera.image_height - j, "   ")
         for i = 0:(camera.image_width - 1)
-            pixel_center = camera.pixel00 + i * camera.Δu + j * camera.Δv
-            ray_direction = pixel_center - camera.center
-            ray = Ray(camera.center, ray_direction)
-            pixel_color = ray_color(world, ray)
-            write_color(pixel_color)
+            pixel_color = Vector3{Float64}(0., 0., 0.)
+            for sample = 1:camera.samples_per_pixel
+                offset_x = rand() - 0.5
+                offset_y = rand() - 0.5
+                pixel_sample::Vector3 =
+                    camera.pixel00 + (i + offset_x) * camera.Δu + (j + offset_y) * camera.Δv
+                ray = Ray(camera.center, pixel_sample - camera.center)
+                pixel_color += ray_color(world, ray)
+            end
+            write_color(pixel_color / camera.samples_per_pixel)
         end
     end
+    print(stderr, "\rDone                       \n")
 end
