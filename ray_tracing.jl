@@ -18,7 +18,7 @@ function surrounds(x::T, interval::Interval{T}) where {T}
     return (x > interval.xmin) && (x < interval.xmax)
 end
 
-function clamp(x::T, interval::Interval{T}) where {T}
+function clamp(x::R, interval::Interval{T}) where {R,T}
     if x < interval.xmin
         return interval.xmin
     elseif x > interval.xmax
@@ -36,6 +36,9 @@ const Vector3{T} = SVector{3,T}
 
 Color() = Color(zeros(UInt8, 3))
 
+function reflect(v::Vector3{T}, n::Vector3{T}) where {T}
+    return v - 2 * (v ⋅ n) * n
+end
 
 function random_unit_vector()
     while true
@@ -81,15 +84,32 @@ function (ray::Ray{T})(t::T) where {T}
     return ray.origin + t * ray.direction
 end
 
+abstract type Material end
+
+struct Lambertian <: Material
+    albedo::Vector3{Float64}
+end
+
+struct Metal <: Material
+    albedo::Vector3{Float64}
+end
+
 mutable struct HitRecord{T}
     p::Point3{T}
     normal::Vector3{T}
+    material::Material
     t::T
     front_face::Bool
 end
 
 function HitRecord{T}() where {T}
-    return HitRecord{T}(Point3(zeros(T, 3)...), Vector3(zeros(T, 3)...), zero(T), false)
+    return HitRecord{T}(
+        Point3(zeros(T, 3)...),
+        Vector3(zeros(T, 3)...),
+        Metal(Vector3(zeros(T, 3))),
+        zero(T),
+        false,
+    )
 end
 
 function set_face_normal(record::HitRecord{T}, ray::Ray{T}, normal::Vector3{T}) where {T}
@@ -102,6 +122,7 @@ abstract type Hittable end
 struct Sphere{T} <: Hittable where {T}
     center::Point3{T}
     radius::T
+    material::Material
 end
 
 
@@ -132,7 +153,7 @@ function hit(
     record.t = root
     record.p = ray(root)
     outward_normal = (record.p - sphere.center) / sphere.radius
-
+    record.material = sphere.material
     set_face_normal(record, ray, outward_normal)
 
     return true
@@ -165,14 +186,40 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
 
     record = HitRecord{T}()
     if (hit(hittable_list, ray, Interval(0.001, Inf), record))
-        direction = record.normal + random_unit_vector()
-        return 0.5 * ray_color(hittable_list, Ray(record.p, direction), depth - 1)
+        scatter_info = scatter(record.material, ray, record)
+        if scatter_info.is_scattered
+            return scatter_info.attenuation .*
+                   ray_color(hittable_list, scatter_info.scattered, depth - 1)
+        end
+        # @show scatter_info.attenuation
     end
     unit_vector = normalize(ray.direction)
     a = 0.5 * (unit_vector.y + 1)
 
     return (1 - a) * Vector3(1, 1, 1) + a * Vector3(0.5, 0.7, 1.0)
 end
+
+function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
+    reflected = reflect(ray.direction, record.normal)
+    scattered = Ray(record.p, reflected)
+    attenuation = metal.albedo
+    return (scattered = scattered, attenuation = attenuation, is_scattered = true)
+end
+
+function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) where {T}
+    near_zero(v) = all(abs.(v) .< 1e-8)
+    scattered_direction = record.normal + random_unit_vector()
+
+    if (near_zero(scattered_direction))
+        scattered_direction = record.normal
+    end
+
+    scattered = Ray(record.p, scattered_direction)
+    attenuation = lambertian.albedo
+    return (scattered = scattered, attenuation = attenuation, is_scattered = true)
+end
+
+
 
 struct Camera{T}
     image_height::Int
@@ -247,3 +294,5 @@ function render(camera::Camera, world::HittableList)
     end
     print(stderr, "\rDone                       \n")
 end
+
+
