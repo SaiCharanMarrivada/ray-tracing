@@ -162,8 +162,8 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
     end
 
     record = HitRecord{T}()
-    if (hit(hittable_list, ray, Interval(0.0, Inf), record))
-        direction = random_on_hemisphere(record.normal)
+    if (hit(hittable_list, ray, Interval(0.001, Inf), record))
+        direction = record.normal + random_unit_vector()
         return 0.5 * ray_color(hittable_list, Ray(record.p, direction), depth - 1)
     end
     unit_vector = normalize(ray.direction)
