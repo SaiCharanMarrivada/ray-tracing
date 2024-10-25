@@ -36,6 +36,22 @@ const Vector3{T} = SVector{3,T}
 
 Color() = Color(zeros(UInt8, 3))
 
+
+function random_unit_vector()
+    while true
+        p = Vector3(rand(), rand(), rand())
+        if 1e-160 < (p ⋅ p) ≤ 1
+            return normalize(p)
+        end
+    end
+end
+
+function random_on_hemisphere(normal::Vector3{T}) where {T}
+    unitvector::Vector3 = random_unit_vector()
+    return (unitvector ⋅ normal) > 0 ? unitvector : -unitvector
+end
+
+
 function write_color(v::Vector3{T}) where {T}
     interval = Ref(Interval{T}(0.000, 0.999))
     color = Color(floor.(256 * clamp.(v, interval)))
@@ -140,11 +156,15 @@ function hit(
     return hit_anything
 end
 
-function ray_color(hittable_list::HittableList, ray::Ray{T}) where {T}
+function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {T}
+    if depth ≤ 0
+        return Vector3(0, 0, 0)
+    end
+
     record = HitRecord{T}()
     if (hit(hittable_list, ray, Interval(0.0, Inf), record))
-        # @show record
-        return 0.5 * (record.normal + Vector3(1, 1, 1))
+        direction = random_on_hemisphere(record.normal)
+        return 0.5 * ray_color(hittable_list, Ray(record.p, direction), depth - 1)
     end
     unit_vector = normalize(ray.direction)
     a = 0.5 * (unit_vector.y + 1)
@@ -156,6 +176,7 @@ struct Camera{T}
     image_height::Int
     image_width::Int
     samples_per_pixel::Int
+    max_depth::Int
     aspect_ratio::Float64
     center::Point3{T}
     pixel00::Point3{T}
@@ -163,7 +184,12 @@ struct Camera{T}
     Δv::Vector3{T}
 end
 
-function Camera(image_width::Int, aspect_ratio::Float64; samples_per_pixel = 100)
+function Camera(
+    image_width::Int,
+    aspect_ratio::Float64;
+    samples_per_pixel = 100,
+    max_depth = 10,
+)
     image_height = Int(floor(image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
 
@@ -188,6 +214,7 @@ function Camera(image_width::Int, aspect_ratio::Float64; samples_per_pixel = 100
         image_height,
         image_width,
         samples_per_pixel,
+        max_depth,
         aspect_ratio,
         center,
         pixel00,
@@ -197,23 +224,21 @@ function Camera(image_width::Int, aspect_ratio::Float64; samples_per_pixel = 100
 end
 
 function render(camera::Camera, world::HittableList)
-    # progress_bar = ProgressBar(0:(camera.image_height - 1))
-
     println("P3")
     println(camera.image_width, ' ', camera.image_height)
     println(255)
 
-    for j in 0:camera.image_height - 1
+    for j = 0:(camera.image_height - 1)
         print(stderr, "\rScanlines remaining: ", camera.image_height - j, "   ")
         for i = 0:(camera.image_width - 1)
-            pixel_color = Vector3{Float64}(0., 0., 0.)
-            for sample = 1:camera.samples_per_pixel
+            pixel_color = Vector3{Float64}(0.0, 0.0, 0.0)
+            for sample = 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
                 offset_y = rand() - 0.5
                 pixel_sample::Vector3 =
                     camera.pixel00 + (i + offset_x) * camera.Δu + (j + offset_y) * camera.Δv
                 ray = Ray(camera.center, pixel_sample - camera.center)
-                pixel_color += ray_color(world, ray)
+                pixel_color += ray_color(world, ray, camera.max_depth)
             end
             write_color(pixel_color / camera.samples_per_pixel)
         end
