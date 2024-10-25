@@ -9,14 +9,13 @@ function main()
 
     push!(world, Sphere(Point3(0, -100.5, -1.0), 100.0, ground_material))
     push!(world, Sphere(Point3(0, 0, -1.2), 0.5, center_material))
-    push!(world, Sphere(Point3(-1, 0, -1.), 0.5, left_material))
-    push!(world, Sphere(Point3(1, 0, -1.), 0.5, right_material))
+    push!(world, Sphere(Point3(-1, 0, -1.0), 0.5, left_material))
+    push!(world, Sphere(Point3(1, 0, -1.0), 0.5, right_material))
 
     aspect_ratio = 16.0 / 9.0
     image_width = 400
-    camera = Camera(image_width, aspect_ratio, samples_per_pixel = 100, max_depth = 50)
-    render(camera, world)
+    camera = Camera(image_width, aspect_ratio; samples_per_pixel=100, max_depth=50)
+    return render(camera, world)
 end
-
 
 main()

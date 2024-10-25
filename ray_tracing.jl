@@ -1,7 +1,6 @@
 using StaticArrays
 using LinearAlgebra
 
-
 struct Interval{T}
     xmin::T
     xmax::T
@@ -60,7 +59,7 @@ function write_color(v::Vector3{T}) where {T}
     interval = Ref(Interval{T}(0.000, 0.999))
     v = linear_to_γ.(v)
     color = Color(floor.(256 * clamp.(v, interval)))
-    println(join(color, ' '))
+    return println(join(color, ' '))
 end
 
 function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
@@ -114,7 +113,7 @@ end
 
 function set_face_normal(record::HitRecord{T}, ray::Ray{T}, normal::Vector3{T}) where {T}
     record.front_face = (ray.direction ⋅ normal) < 0
-    record.normal = record.front_face ? normal : -normal
+    return record.normal = record.front_face ? normal : -normal
 end
 
 abstract type Hittable end
@@ -125,12 +124,8 @@ struct Sphere{T} <: Hittable where {T}
     material::Material
 end
 
-
 function hit(
-    sphere::Sphere{T},
-    ray::Ray{T},
-    interval::Interval{T},
-    record::HitRecord{T},
+    sphere::Sphere{T}, ray::Ray{T}, interval::Interval{T}, record::HitRecord{T}
 ) where {T}
     oc = sphere.center - ray.origin
     a = ray.direction ⋅ ray.direction
@@ -157,16 +152,12 @@ function hit(
     set_face_normal(record, ray, outward_normal)
 
     return true
-
 end
 
 const HittableList = Vector{Hittable}
 
 function hit(
-    hittable_list::HittableList,
-    ray::Ray{T},
-    interval::Interval{T},
-    record::HitRecord{T},
+    hittable_list::HittableList, ray::Ray{T}, interval::Interval{T}, record::HitRecord{T}
 ) where {T}
     closest_so_far = interval.xmax
     hit_anything = false
@@ -203,7 +194,7 @@ function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
     reflected = reflect(ray.direction, record.normal)
     scattered = Ray(record.p, reflected)
     attenuation = metal.albedo
-    return (scattered = scattered, attenuation = attenuation, is_scattered = true)
+    return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
 function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) where {T}
@@ -216,10 +207,8 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
 
     scattered = Ray(record.p, scattered_direction)
     attenuation = lambertian.albedo
-    return (scattered = scattered, attenuation = attenuation, is_scattered = true)
+    return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
-
-
 
 struct Camera{T}
     image_height::Int
@@ -234,10 +223,7 @@ struct Camera{T}
 end
 
 function Camera(
-    image_width::Int,
-    aspect_ratio::Float64;
-    samples_per_pixel = 100,
-    max_depth = 10,
+    image_width::Int, aspect_ratio::Float64; samples_per_pixel=100, max_depth=10
 )
     image_height = Int(floor(image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
@@ -277,11 +263,11 @@ function render(camera::Camera, world::HittableList)
     println(camera.image_width, ' ', camera.image_height)
     println(255)
 
-    for j = 0:(camera.image_height - 1)
+    for j in 0:(camera.image_height - 1)
         print(stderr, "\rScanlines remaining: ", camera.image_height - j, "   ")
-        for i = 0:(camera.image_width - 1)
+        for i in 0:(camera.image_width - 1)
             pixel_color = Vector3{Float64}(0.0, 0.0, 0.0)
-            for sample = 1:(camera.samples_per_pixel)
+            for sample in 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
                 offset_y = rand() - 0.5
                 pixel_sample::Vector3 =
@@ -292,7 +278,5 @@ function render(camera::Camera, world::HittableList)
             write_color(pixel_color / camera.samples_per_pixel)
         end
     end
-    print(stderr, "\rDone                       \n")
+    return print(stderr, "\rDone                       \n")
 end
-
-
