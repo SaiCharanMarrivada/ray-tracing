@@ -1,7 +1,7 @@
 using StaticArrays
 using LinearAlgebra
 
-struct Interval{T}
+struct Interval{T<:AbstractFloat}
     xmin::T
     xmax::T
 end
@@ -74,7 +74,7 @@ function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
     end
 end
 
-struct Ray{T}
+struct Ray{T<:AbstractFloat}
     origin::Point3{T}
     direction::Vector3{T}
 end
@@ -85,15 +85,16 @@ end
 
 abstract type Material end
 
-struct Lambertian <: Material
-    albedo::Vector3{Float64}
+struct Lambertian{T<:AbstractFloat} <: Material
+    albedo::Vector3{T}
 end
 
-struct Metal <: Material
-    albedo::Vector3{Float64}
+struct Metal{T<:AbstractFloat} <: Material
+    albedo::Vector3{T}
+    fuzz::T
 end
 
-mutable struct HitRecord{T}
+mutable struct HitRecord{T<:AbstractFloat}
     p::Point3{T}
     normal::Vector3{T}
     material::Material
@@ -105,7 +106,7 @@ function HitRecord{T}() where {T}
     return HitRecord{T}(
         Point3(zeros(T, 3)...),
         Vector3(zeros(T, 3)...),
-        Metal(Vector3(zeros(T, 3))),
+        Metal(Vector3(zeros(T, 3)), 1.0),
         zero(T),
         false,
     )
@@ -118,7 +119,7 @@ end
 
 abstract type Hittable end
 
-struct Sphere{T} <: Hittable where {T}
+struct Sphere{T<:AbstractFloat} <: Hittable where {T}
     center::Point3{T}
     radius::T
     material::Material
@@ -192,7 +193,8 @@ end
 
 function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
     reflected = reflect(ray.direction, record.normal)
-    scattered = Ray(record.p, reflected)
+    fuzzy_reflected = reflected + metal.fuzz * random_unit_vector()
+    scattered = Ray(record.p, fuzzy_reflected)
     attenuation = metal.albedo
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
@@ -210,7 +212,7 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
-struct Camera{T}
+struct Camera{T<:AbstractFloat}
     image_height::Int
     image_width::Int
     samples_per_pixel::Int
