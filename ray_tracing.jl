@@ -106,7 +106,7 @@ function HitRecord{T}() where {T}
     return HitRecord{T}(
         Point3(zeros(T, 3)...),
         Vector3(zeros(T, 3)...),
-        Metal(Vector3(zeros(T, 3)), 1.0),
+        Metal(Vector3(zeros(T, 3)), 0.5),
         zero(T),
         false,
     )
@@ -193,10 +193,11 @@ end
 
 function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
     reflected = reflect(ray.direction, record.normal)
-    fuzzy_reflected = reflected + metal.fuzz * random_unit_vector()
-    scattered = Ray(record.p, fuzzy_reflected)
+    reflected = normalize(reflected) + metal.fuzz * random_unit_vector()
+    scattered = Ray(record.p, reflected)
     attenuation = metal.albedo
-    return (scattered=scattered, attenuation=attenuation, is_scattered=true)
+    is_scattered = (scattered.direction ⋅ reflected > 0)
+    return (scattered=scattered, attenuation=attenuation, is_scattered=is_scattered)
 end
 
 function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) where {T}
