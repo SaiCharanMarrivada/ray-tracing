@@ -39,6 +39,14 @@ function reflect(v::Vector3{T}, n::Vector3{T}) where {T}
     return v - 2 * (v ⋅ n) * n
 end
 
+function refract(uv::Vector3{T}, n::Vector3{T}, relative_η::T) where {T}
+    cosθ = min(-uv ⋅ n, 1.0)
+    r_out_perp = relative_η * (uv + cosθ * n)
+    r_out_parallel = -sqrt(abs(1 - norm(r_out_perp))) * n
+    return r_out_perp + r_out_parallel
+
+end
+
 function random_unit_vector()
     while true
         p = Vector3(rand(), rand(), rand())
@@ -92,6 +100,10 @@ end
 struct Metal{T<:AbstractFloat} <: Material
     albedo::Vector3{T}
     fuzz::T
+end
+
+struct Dielectric{T<:AbstractFloat} <: Material
+    η::T
 end
 
 mutable struct HitRecord{T<:AbstractFloat}
@@ -213,12 +225,20 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
+function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) where {T}
+    attenuation = Vector3(1.0, 1.0, 1.0)
+    relative_η = record.front_face ? 1 / dielectric.η : dielectric.η
+    refracted = refract(normalize(ray.direction), record.normal, relative_η)
+    scattered = Ray(record.p, refracted)
+    return (scattered=scattered, attenuation=attenuation, is_scattered=true)
+end
+
 struct Camera{T<:AbstractFloat}
     image_height::Int
     image_width::Int
     samples_per_pixel::Int
     max_depth::Int
-    aspect_ratio::Float64
+    aspect_ratio::T #Float64
     center::Point3{T}
     pixel00::Point3{T}
     Δu::Vector3{T}
@@ -226,7 +246,7 @@ struct Camera{T<:AbstractFloat}
 end
 
 function Camera(
-    image_width::Int, aspect_ratio::Float64; samples_per_pixel=100, max_depth=10
+    image_width::Int, aspect_ratio::AbstractFloat; samples_per_pixel=100, max_depth=10
 )
     image_height = Int(floor(image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height

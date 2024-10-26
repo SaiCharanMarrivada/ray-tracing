@@ -4,7 +4,7 @@ function main()
     world = HittableList()
     ground_material = Lambertian(Vector3(0.8, 0.8, 0))
     center_material = Lambertian(Vector3(0.1, 0.2, 0.5))
-    left_material = Metal(Vector3(0.8, 0.8, 0.8), 0.3)
+    left_material = Dielectric(1.5)
     right_material = Metal(Vector3(0.8, 0.6, 0.2), 1.0)
 
     push!(world, Sphere(Point3(0, -100.5, -1.0), 100.0, ground_material))
