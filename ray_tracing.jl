@@ -60,18 +60,8 @@ function random_in_unit_disk()
     end
 end
 
-linear_to_γ(linear_component::Float64) = (linear_component > 0) ? sqrt(linear_component) : 0
-
-function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
-    if name == :x
-        return v[1]
-    elseif name == :y
-        return v[2]
-    elseif name == :z
-        return v[3]
-    else
-        throw("Unknown property")
-    end
+function linear_to_γ(linear_component::T) where {T<:AbstractFloat}
+    return (linear_component > 0) ? sqrt(linear_component) : 0
 end
 
 struct Ray{T<:AbstractFloat}
@@ -79,9 +69,7 @@ struct Ray{T<:AbstractFloat}
     direction::Vector3{T}
 end
 
-function (ray::Ray{T})(t::T) where {T}
-    return ray.origin + t * ray.direction
-end
+(ray::Ray{T})(t::T) where {T} = ray.origin + t * ray.direction
 
 abstract type Material end
 
@@ -170,7 +158,7 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
     end
 
     record = HitRecord{T}()
-    if (hit(hittable_list, ray, Interval(0.001, Inf), record))
+    if (hit(hittable_list, ray, Interval{T}(0.001, Inf), record))
         scatter_info = scatter(record.material, ray, record)
         if scatter_info.is_scattered
             return scatter_info.attenuation .*
@@ -318,8 +306,8 @@ end
 function render(camera::Camera, world::HittableList)
     image = Matrix{Color}(undef, camera.image_width, camera.image_height)
 
-    Threads.@threads for j in 1:camera.image_height
-        for i in 1:camera.image_width
+    Threads.@threads for j in 1:(camera.image_height)
+        for i in 1:(camera.image_width)
             pixel_color = Vector3{Float64}()
             for sample in 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
@@ -332,9 +320,10 @@ function render(camera::Camera, world::HittableList)
                 pixel_color += ray_color(world, ray, camera.max_depth)
             end
             pixel_color /= camera.samples_per_pixel
+            # tranform color to γ-space
             pixel_color = linear_to_γ.(pixel_color)
             pixel_color = unsafe_trunc.(UInt8, 256 * clamp.(pixel_color, 0.000, 0.999))
-            image[i, j] = pixel_color
+            @inbounds image[i, j] = pixel_color
         end
     end
     return image
