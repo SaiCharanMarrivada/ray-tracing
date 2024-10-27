@@ -42,7 +42,7 @@ end
 function refract(uv::Vector3{T}, n::Vector3{T}, relative_η::T) where {T}
     cosθ = min(-uv ⋅ n, 1.0)
     r_out_perp = relative_η * (uv + cosθ * n)
-    r_out_parallel = -sqrt(abs(1 - norm(r_out_perp))) * n
+    r_out_parallel = -sqrt(abs(1 - (r_out_perp ⋅ r_out_perp))) * n
     return r_out_perp + r_out_parallel
 end
 
