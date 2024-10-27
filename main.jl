@@ -52,7 +52,18 @@ function main()
         vup=Point3(0.0, 1.0, 0.0),
     )
 
-    render(camera, world)
+    image = render(camera, world)
+
+    # write image in ppm format
+    println("P3\n")
+    println(camera.image_width, ' ', camera.image_height)
+    println(255)
+
+    for j in 1:camera.image_height
+        for i in 1:camera.image_width
+            println(join(image[i, j], ' '))
+        end
+    end
 end
 
 main()

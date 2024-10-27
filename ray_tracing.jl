@@ -62,12 +62,6 @@ end
 
 linear_to_γ(linear_component::Float64) = (linear_component > 0) ? sqrt(linear_component) : 0
 
-function write_color(v::Vector3{T}) where {T}
-    v = linear_to_γ.(v)
-    color = unsafe_trunc.(UInt8, 256 * clamp.(v, 0.000, 0.999))
-    return println(join(color, ' '))
-end
-
 function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
     if name == :x
         return v[1]
@@ -172,7 +166,7 @@ end
 
 function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {T}
     if depth ≤ 0
-        return Vector3(0, 0, 0)
+        return Vector3{T}()
     end
 
     record = HitRecord{T}()
@@ -186,7 +180,7 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
     unit_vector = normalize(ray.direction)
     a = 0.5 * (unit_vector.y + 1)
 
-    return (1 - a) * Vector3(1, 1, 1) + a * Vector3(0.5, 0.7, 1.0)
+    return (1 - a) * Vector3(ones(T, 3)) + a * Vector3{T}(0.5, 0.7, 1.0)
 end
 
 function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
@@ -243,7 +237,7 @@ struct Camera{T<:AbstractFloat}
     look_from::Point3{T}
     look_at::Point3{T}
     vup::Point3{T}
-    aspect_ratio::T #Float64
+    aspect_ratio::T
     center::Point3{T}
     pixel00::Point3{T}
     Δu::Vector3{T}
@@ -322,13 +316,10 @@ function defocus_disk_sample(camera::Camera)
 end
 
 function render(camera::Camera, world::HittableList)
-    println("P3")
-    println(camera.image_width, ' ', camera.image_height)
-    println(255)
+    image = Matrix{Color}(undef, camera.image_width, camera.image_height)
 
-    for j in 0:(camera.image_height - 1)
-        print(stderr, "\rScanlines remaining: ", camera.image_height - j, "   ")
-        for i in 0:(camera.image_width - 1)
+    Threads.@threads for j in 1:camera.image_height
+        for i in 1:camera.image_width
             pixel_color = Vector3{Float64}()
             for sample in 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
@@ -340,8 +331,11 @@ function render(camera::Camera, world::HittableList)
                 ray = Ray(ray_origin, pixel_sample - ray_origin)
                 pixel_color += ray_color(world, ray, camera.max_depth)
             end
-            write_color(pixel_color / camera.samples_per_pixel)
+            pixel_color /= camera.samples_per_pixel
+            pixel_color = linear_to_γ.(pixel_color)
+            pixel_color = unsafe_trunc.(UInt8, 256 * clamp.(pixel_color, 0.000, 0.999))
+            image[i, j] = pixel_color
         end
     end
-    return print(stderr, "\rDone                       \n")
+    return image
 end
