@@ -1,27 +1,10 @@
 using StaticArrays
 using LinearAlgebra
 
-struct Interval{T<:AbstractFloat}
-    xmin::T
-    xmax::T
-end
-
-const Universe = Interval(-Inf, Inf)
-const Empty = Interval(Inf, -Inf)
-
-function Base.:∈(x::T, interval::Interval{T}) where {T}
-    return (x ≥ interval.xmin) && (x ≤ interval.xmax)
-end
-
-function surrounds(x::T, interval::Interval{T}) where {T}
-    return (x > interval.xmin) && (x < interval.xmax)
-end
-
-Base.length(interval::Interval{T}) where {T} = interval.xmax - interval.xmin
-
 const Point3{T} = SVector{3,T}
 const Color = SVector{3,UInt8}
 const Vector3{T} = SVector{3,T}
+const Vector2{T} = SVector{2,T}
 
 Color() = Color(zeros(UInt8, 3))
 Vector3{T}() where {T<:AbstractFloat} = Vector3(zeros(T, 3))
@@ -53,7 +36,7 @@ end
 
 function random_in_unit_disk()
     while true
-        p = Vector3(-1 + 2rand(), -1 + 2rand(), 0)
+        p = Vector2(-1 + 2rand(), -1 + 2rand())
         if (p ⋅ p) < 1
             return p
         end
@@ -107,7 +90,7 @@ struct Sphere{T<:AbstractFloat} <: Hittable where {T}
 end
 
 function hit(
-    sphere::Sphere{T}, ray::Ray{T}, interval::Interval{T}, record::HitRecord{T}
+    sphere::Sphere{T}, ray::Ray{T}, tmin::T, tmax::T, record::HitRecord{T}
 ) where {T}
     oc = sphere.center - ray.origin
     a = ray.direction ⋅ ray.direction
@@ -120,9 +103,9 @@ function hit(
     end
 
     root = (h - sqrt(Δ)) / a
-    if (!surrounds(root, interval))
+    if (root ≤ tmin || root ≥ tmax)
         root = (h + sqrt(Δ)) / a
-        if (!surrounds(root, interval))
+        if (root ≤ tmin || root ≥ tmax)
             return false
         end
     end
@@ -139,12 +122,12 @@ end
 const HittableList = Vector{Hittable}
 
 function hit(
-    hittable_list::HittableList, ray::Ray{T}, interval::Interval{T}, record::HitRecord{T}
+    hittable_list::HittableList, ray::Ray{T}, tmin::T, tmax::T, record::HitRecord{T}
 ) where {T}
-    closest_so_far = interval.xmax
+    closest_so_far = tmax
     hit_anything = false
     for object in hittable_list
-        if (hit(object, ray, Interval(interval.xmin, closest_so_far), record))
+        if (hit(object, ray, tmin, closest_so_far, record))
             closest_so_far = record.t
             hit_anything = true
         end
@@ -158,7 +141,7 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
     end
 
     record = HitRecord{T}()
-    if (hit(hittable_list, ray, Interval{T}(0.001, Inf), record))
+    if (hit(hittable_list, ray, T(0.001), T(Inf), record))
         scatter_info = scatter(record.material, ray, record)
         if scatter_info.is_scattered
             return scatter_info.attenuation .*
@@ -194,7 +177,7 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
 end
 
 function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) where {T}
-    attenuation = Vector3(1.0, 1.0, 1.0)
+    attenuation = Vector3(ones(T, 3))
     relative_η = record.front_face ? 1 / dielectric.η : dielectric.η
     unit_direction = normalize(ray.direction)
     cosθ = min(-unit_direction ⋅ record.normal, 1.0)
