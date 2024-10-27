@@ -55,7 +55,7 @@ linear_to_γ(linear_component::Float64) = (linear_component > 0) ? sqrt(linear_c
 
 function write_color(v::Vector3{T}) where {T}
     v = linear_to_γ.(v)
-    color = Color(unsafe_trunc.(UInt8, 256 * clamp.(v, 0.000, 0.999)))
+    color = unsafe_trunc.(UInt8, 256 * clamp.(v, 0.000, 0.999))
     println(join(color, ' '))
 end
 
@@ -113,11 +113,6 @@ function HitRecord{T}() where {T}
     )
 end
 
-function set_face_normal(record::HitRecord{T}, ray::Ray{T}, normal::Vector3{T}) where {T}
-    record.front_face = (ray.direction ⋅ normal) < 0
-    return record.normal = record.front_face ? normal : -normal
-end
-
 abstract type Hittable end
 
 struct Sphere{T<:AbstractFloat} <: Hittable where {T}
@@ -151,8 +146,8 @@ function hit(
     record.p = ray(root)
     outward_normal = (record.p - sphere.center) / sphere.radius
     record.material = sphere.material
-    set_face_normal(record, ray, outward_normal)
-
+    record.front_face = (ray.direction ⋅ outward_normal) < 0
+    record.normal = record.front_face ? outward_normal : -outward_normal
     return true
 end
 
@@ -184,7 +179,6 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
             return scatter_info.attenuation .*
                    ray_color(hittable_list, scatter_info.scattered, depth - 1)
         end
-        # @show scatter_info.attenuation
     end
     unit_vector = normalize(ray.direction)
     a = 0.5 * (unit_vector.y + 1)
