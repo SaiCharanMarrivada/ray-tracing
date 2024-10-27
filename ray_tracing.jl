@@ -17,16 +17,6 @@ function surrounds(x::T, interval::Interval{T}) where {T}
     return (x > interval.xmin) && (x < interval.xmax)
 end
 
-function clamp(x::R, interval::Interval{T}) where {R,T}
-    if x < interval.xmin
-        return interval.xmin
-    elseif x > interval.xmax
-        return interval.xmax
-    else
-        return x
-    end
-end
-
 Base.length(interval::Interval{T}) where {T} = interval.xmax - interval.xmin
 
 const Point3{T} = SVector{3,T}
@@ -34,6 +24,7 @@ const Color = SVector{3,UInt8}
 const Vector3{T} = SVector{3,T}
 
 Color() = Color(zeros(UInt8, 3))
+Vector3{T}() where {T<:AbstractFloat} = Vector3(zeros(T, 3))
 
 function reflect(v::Vector3{T}, n::Vector3{T}) where {T}
     return v - 2 * (v ⋅ n) * n
@@ -48,7 +39,7 @@ end
 
 function random_unit_vector()
     while true
-        p = Vector3(rand(), rand(), rand())
+        p = Vector3(rand(3))
         if 1e-160 < (p ⋅ p) ≤ 1
             return normalize(p)
         end
@@ -63,10 +54,9 @@ end
 linear_to_γ(linear_component::Float64) = (linear_component > 0) ? sqrt(linear_component) : 0
 
 function write_color(v::Vector3{T}) where {T}
-    interval = Ref(Interval{T}(0.000, 0.999))
     v = linear_to_γ.(v)
-    color = Color(floor.(256 * clamp.(v, interval)))
-    return println(join(color, ' '))
+    color = Color(unsafe_trunc.(UInt8, 256 * clamp.(v, 0.000, 0.999)))
+    println(join(color, ' '))
 end
 
 function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
@@ -253,6 +243,9 @@ struct Camera{T<:AbstractFloat}
     samples_per_pixel::Int
     max_depth::Int
     vfov::T
+    look_from::Point3{T}
+    look_at::Point3{T}
+    vup::Point3{T}
     aspect_ratio::T #Float64
     center::Point3{T}
     pixel00::Point3{T}
@@ -261,26 +254,37 @@ struct Camera{T<:AbstractFloat}
 end
 
 function Camera(
-    image_width::Int, aspect_ratio::AbstractFloat; samples_per_pixel=100, max_depth=10, vfov=90.0
-)
-    image_height = Int(floor(image_width / aspect_ratio))
+    image_width::Int,
+    aspect_ratio::T;
+    samples_per_pixel=100,
+    max_depth=10,
+    vfov=90.0,
+    look_from=Point3{T}(-2, 2, 1),
+    look_at=Point3{T}(0, 0, -1),
+    vup=Vector3{T}(0, 1, 0),
+) where {T<:AbstractFloat}
+    image_height = Int(unsafe_trunc(Int, image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
 
-    focal_length = 1.0
+    focal_length = norm(look_from - look_at)
     θ = deg2rad(90)
     h = tan(θ / 2)
     viewport_height = 2 * h * focal_length
     viewport_width = viewport_height * (image_width / image_height)
-    center = Point3(0, 0, 0.0)
+    center = look_from
 
-    viewport_u = Vector3(viewport_width, 0, 0)
-    viewport_v = Vector3(0, -viewport_height, 0)
+    w = normalize(look_from - look_at)
+    u = normalize(vup × w)
+    v = w × u
+
+    viewport_u = viewport_width * u
+    viewport_v = viewport_height * -v
 
     Δu = viewport_u / image_width
     Δv = viewport_v / image_height
 
     pixel00 = (
-        center - Vector3(0, 0, focal_length) - (viewport_u / 2) - (viewport_v / 2) +
+        center - focal_length * w - (viewport_u / 2) - (viewport_v / 2) +
         (Δu / 2) +
         (Δv / 2)
     )
@@ -291,6 +295,9 @@ function Camera(
         samples_per_pixel,
         max_depth,
         vfov,
+        look_from,
+        look_at,
+        vup,
         aspect_ratio,
         center,
         pixel00,
@@ -307,7 +314,7 @@ function render(camera::Camera, world::HittableList)
     for j in 0:(camera.image_height - 1)
         print(stderr, "\rScanlines remaining: ", camera.image_height - j, "   ")
         for i in 0:(camera.image_width - 1)
-            pixel_color = Vector3{Float64}(0.0, 0.0, 0.0)
+            pixel_color = Vector3{Float64}()
             for sample in 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
                 offset_y = rand() - 0.5
