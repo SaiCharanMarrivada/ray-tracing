@@ -113,13 +113,7 @@ mutable struct HitRecord{T<:AbstractFloat}
 end
 
 function HitRecord{T}() where {T}
-    return HitRecord{T}(
-        Point3(zeros(T, 3)...),
-        Vector3(zeros(T, 3)...),
-        Metal(Vector3(zeros(T, 3)), 0.5),
-        zero(T),
-        false,
-    )
+    return HitRecord{T}(Point3{T}(), Vector3{T}(), Metal(Vector3{T}(), 0.5), T(0), false)
 end
 
 abstract type Hittable end
@@ -272,7 +266,7 @@ function Camera(
     look_at=Point3{T}(0, 0, -1),
     vup=Vector3{T}(0, 1, 0),
 ) where {T<:AbstractFloat}
-    image_height = Int(unsafe_trunc(Int, image_width / aspect_ratio))
+    image_height = unsafe_trunc(Int, image_width / aspect_ratio)
     image_height = (image_height < 1) ? 1 : image_height
 
     θ = deg2rad(vfov)
