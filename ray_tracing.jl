@@ -252,6 +252,7 @@ struct Camera{T<:AbstractFloat}
     image_width::Int
     samples_per_pixel::Int
     max_depth::Int
+    vfov::T
     aspect_ratio::T #Float64
     center::Point3{T}
     pixel00::Point3{T}
@@ -260,13 +261,15 @@ struct Camera{T<:AbstractFloat}
 end
 
 function Camera(
-    image_width::Int, aspect_ratio::AbstractFloat; samples_per_pixel=100, max_depth=10
+    image_width::Int, aspect_ratio::AbstractFloat; samples_per_pixel=100, max_depth=10, vfov=90.0
 )
     image_height = Int(floor(image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
 
     focal_length = 1.0
-    viewport_height = 2.0
+    θ = deg2rad(90)
+    h = tan(θ / 2)
+    viewport_height = 2 * h * focal_length
     viewport_width = viewport_height * (image_width / image_height)
     center = Point3(0, 0, 0.0)
 
@@ -287,6 +290,7 @@ function Camera(
         image_width,
         samples_per_pixel,
         max_depth,
+        vfov,
         aspect_ratio,
         center,
         pixel00,

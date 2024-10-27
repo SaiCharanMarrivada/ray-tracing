@@ -17,7 +17,8 @@ function main()
 
     aspect_ratio = 16.0 / 9.0
     image_width = 400
-    camera = Camera(image_width, aspect_ratio; samples_per_pixel=100, max_depth=50)
+    camera = Camera(image_width, aspect_ratio, samples_per_pixel=100, max_depth=50)
+
     return render(camera, world)
 end
 
