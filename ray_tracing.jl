@@ -228,8 +228,17 @@ end
 function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) where {T}
     attenuation = Vector3(1.0, 1.0, 1.0)
     relative_η = record.front_face ? 1 / dielectric.η : dielectric.η
-    refracted = refract(normalize(ray.direction), record.normal, relative_η)
-    scattered = Ray(record.p, refracted)
+    unit_direction = normalize(ray.direction)
+    cosθ = min(-unit_direction ⋅ record.normal, 1.0)
+    sinθ = sqrt(1 - cosθ * cosθ)
+
+    if (relative_η * sinθ > 1)
+        direction = reflect(unit_direction, record.normal)
+    else
+        direction = refract(unit_direction, record.normal, relative_η)
+    end
+
+    scattered = Ray(record.p, direction)
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
