@@ -44,7 +44,6 @@ function refract(uv::Vector3{T}, n::Vector3{T}, relative_η::T) where {T}
     r_out_perp = relative_η * (uv + cosθ * n)
     r_out_parallel = -sqrt(abs(1 - norm(r_out_perp))) * n
     return r_out_perp + r_out_parallel
-
 end
 
 function random_unit_vector()
@@ -232,7 +231,7 @@ function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) wher
     cosθ = min(-unit_direction ⋅ record.normal, 1.0)
     sinθ = sqrt(1 - cosθ * cosθ)
 
-    if (relative_η * sinθ > 1)
+    if (relative_η * sinθ > 1) || (reflectance(cosθ, relative_η) > rand())
         direction = reflect(unit_direction, record.normal)
     else
         direction = refract(unit_direction, record.normal, relative_η)
@@ -240,6 +239,12 @@ function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) wher
 
     scattered = Ray(record.p, direction)
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
+end
+
+function reflectance(cosine::T, refractive_index::T) where {T<:AbstractFloat}
+    r0 = (1 - refractive_index) / (1 + refractive_index)
+    r0 = r0 * r0
+    return r0 + (1 - r0) * (1 - cosine)^5
 end
 
 struct Camera{T<:AbstractFloat}
