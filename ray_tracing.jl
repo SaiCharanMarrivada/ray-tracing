@@ -51,12 +51,21 @@ function random_on_hemisphere(normal::Vector3{T}) where {T}
     return (unitvector ⋅ normal) > 0 ? unitvector : -unitvector
 end
 
+function random_in_unit_disk()
+    while true
+        p = Vector3(-1 + 2rand(), -1 + 2rand(), 0)
+        if (p ⋅ p) < 1
+            return p
+        end
+    end
+end
+
 linear_to_γ(linear_component::Float64) = (linear_component > 0) ? sqrt(linear_component) : 0
 
 function write_color(v::Vector3{T}) where {T}
     v = linear_to_γ.(v)
     color = unsafe_trunc.(UInt8, 256 * clamp.(v, 0.000, 0.999))
-    println(join(color, ' '))
+    return println(join(color, ' '))
 end
 
 function Base.getproperty(v::Vector3{T}, name::Symbol) where {T}
@@ -245,6 +254,10 @@ struct Camera{T<:AbstractFloat}
     pixel00::Point3{T}
     Δu::Vector3{T}
     Δv::Vector3{T}
+    defocus_angle::T
+    focus_distance::T
+    defocus_disk_u::Vector3{T}
+    defocus_disk_v::Vector3{T}
 end
 
 function Camera(
@@ -252,7 +265,9 @@ function Camera(
     aspect_ratio::T;
     samples_per_pixel=100,
     max_depth=10,
-    vfov=90.0,
+    vfov=20.0,
+    defocus_angle=20.0,
+    focus_distance=3.4,
     look_from=Point3{T}(-2, 2, 1),
     look_at=Point3{T}(0, 0, -1),
     vup=Vector3{T}(0, 1, 0),
@@ -260,16 +275,19 @@ function Camera(
     image_height = Int(unsafe_trunc(Int, image_width / aspect_ratio))
     image_height = (image_height < 1) ? 1 : image_height
 
-    focal_length = norm(look_from - look_at)
-    θ = deg2rad(90)
+    θ = deg2rad(vfov)
     h = tan(θ / 2)
-    viewport_height = 2 * h * focal_length
+    viewport_height = 2 * h * focus_distance
     viewport_width = viewport_height * (image_width / image_height)
     center = look_from
 
     w = normalize(look_from - look_at)
     u = normalize(vup × w)
     v = w × u
+
+    defocus_radius = focus_distance * tan(deg2rad(defocus_angle / 2))
+    defocus_disk_u = defocus_radius * u
+    defocus_disk_v = defocus_radius * v
 
     viewport_u = viewport_width * u
     viewport_v = viewport_height * -v
@@ -278,7 +296,7 @@ function Camera(
     Δv = viewport_v / image_height
 
     pixel00 = (
-        center - focal_length * w - (viewport_u / 2) - (viewport_v / 2) +
+        center - focus_distance * w - (viewport_u / 2) - (viewport_v / 2) +
         (Δu / 2) +
         (Δv / 2)
     )
@@ -297,7 +315,16 @@ function Camera(
         pixel00,
         Δu,
         Δv,
+        defocus_angle,
+        focus_distance,
+        defocus_disk_u,
+        defocus_disk_v,
     )
+end
+
+function defocus_disk_sample(camera::Camera)
+    p = random_in_unit_disk()
+    return camera.center + (p[1] * camera.defocus_disk_u) + (p[2] * camera.defocus_disk_v)
 end
 
 function render(camera::Camera, world::HittableList)
@@ -314,7 +341,9 @@ function render(camera::Camera, world::HittableList)
                 offset_y = rand() - 0.5
                 pixel_sample::Vector3 =
                     camera.pixel00 + (i + offset_x) * camera.Δu + (j + offset_y) * camera.Δv
-                ray = Ray(camera.center, pixel_sample - camera.center)
+                ray_origin =
+                    camera.defocus_angle ≤ 0 ? camera.center : defocus_disk_sample(camera)
+                ray = Ray(ray_origin, pixel_sample - ray_origin)
                 pixel_color += ray_color(world, ray, camera.max_depth)
             end
             write_color(pixel_color / camera.samples_per_pixel)
