@@ -11,7 +11,7 @@ julia -t<nthreads> --optimize=3 -C native main.jl > image.ppm
 The generated image can be viewed with any image viewer.
 
 ## Implementation details
-`Vector4` (an alias for `SVector{4}`) is used instead of `SVector{3}`, with the fourth component being ignored. All operations on `Vector4`s require fewer instructions compared to operations on `Vector3`s.
+`Vector4` (an alias for `SVector{4}`) is used instead of `SVector{3}`, with the fourth component being ignored. All operations on `Vector4`s require fewer instructions compared to operations on `Vector3`s, at the expense of slightly more memory usage.
 
 ### Example
 ```julia
