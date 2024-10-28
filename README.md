@@ -33,7 +33,7 @@ ret
 
 ```julia
 v = Vector3{Float64}(ones(3))
-w = Vector4{Float64}(ones(3))
+w = Vector3{Float64}(ones(3))
 
 @code_native v .* w
 ```
