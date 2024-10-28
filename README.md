@@ -22,12 +22,12 @@ w = Vector4{Float64}(ones(4))
 ```
 Assembly output for element-wise product of `Vector4`s:
 ```asm
-	mov rax, rdi
-	vmovupd ymm0, ymmword ptr [rsi]
-	vmulpd ymm0, ymm0, ymmword ptr [rdx]
-	vmovupd	ymmword ptr [rdi], ymm0
-	vzeroupper
-	ret
+mov rax, rdi
+vmovupd ymm0, ymmword ptr [rsi]
+vmulpd ymm0, ymm0, ymmword ptr [rdx]
+vmovupd	ymmword ptr [rdi], ymm0
+vzeroupper
+ret
 
 ```
 
@@ -39,15 +39,15 @@ w = Vector4{Float64}(ones(3))
 ```
 Assembly output for element-wise product of `Vector3`s:
 ```asm
-	mov rax, rdi
-	vmovsd xmm0, qword ptr [rsi + 16]  
-	vmulsd xmm0, xmm0, qword ptr [rdx + 16]
-	vmovupd	xmm1, xmmword ptr [rsi]
-	vmulpd xmm1, xmm1, xmmword ptr [rdx]
-	vmovupd	xmmword ptr [rdi], xmm1
-	vmovsd qword ptr [rdi + 16], xmm0
-	ret
+mov rax, rdi
+vmovsd xmm0, qword ptr [rsi + 16]
+vmulsd xmm0, xmm0, qword ptr [rdx + 16]
+vmovupd	xmm1, xmmword ptr [rsi]
+vmulpd xmm1, xmm1, xmmword ptr [rdx]
+vmovupd	xmmword ptr [rdi], xmm1
+vmovsd qword ptr [rdi + 16], xmm0
+ret
 ```
 
-	
+
 
