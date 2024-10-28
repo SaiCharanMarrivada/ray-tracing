@@ -11,9 +11,7 @@ julia -t<nthreads> --optimize=3 -C native main.jl > image.ppm
 The generated image can be viewed with any image viewer.
 
 ## Implementation details
-`Vector4`(alias for `SVector{4}`) is used instead of `SVector{3}`, fourth component is
-ignored. All operations on `Vector4`s take less instructions compared to operations on
-`Vector3`s
+`Vector4` (an alias for `SVector{4}`) is used instead of `SVector{3}`, with the fourth component being ignored. All operations on `Vector4`s require fewer instructions compared to operations on `Vector3`s.
 
 ### Example
 ```julia
@@ -36,7 +34,6 @@ Assembly output for element-wise product of `Vector4`s:
 
 ```
 
-When `Vector3`s are used, 
 ```julia
 v = Vector3{Float64}(ones(3))
 w = Vector4{Float64}(ones(3))
