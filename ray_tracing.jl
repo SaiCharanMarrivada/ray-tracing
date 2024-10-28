@@ -1,19 +1,20 @@
 using StaticArrays
 using LinearAlgebra
 
-const Point3{T} = SVector{3,T}
+const Point4{T} = SVector{4,T}
 const Color = SVector{3,UInt8}
+const Vector4{T} = SVector{4,T}
 const Vector3{T} = SVector{3,T}
 const Vector2{T} = SVector{2,T}
 
 Color() = Color(zeros(UInt8, 3))
-Vector3{T}() where {T<:AbstractFloat} = Vector3(zeros(T, 3))
+Vector4{T}() where {T<:AbstractFloat} = Vector4(zeros(T, 4))
 
-function reflect(v::Vector3{T}, n::Vector3{T}) where {T}
+function reflect(v::Vector4{T}, n::Vector4{T}) where {T}
     return v - 2 * (v ⋅ n) * n
 end
 
-function refract(uv::Vector3{T}, n::Vector3{T}, relative_η::T) where {T}
+function refract(uv::Vector4{T}, n::Vector4{T}, relative_η::T) where {T}
     cosθ = min(-uv ⋅ n, 1.0)
     r_out_perp = relative_η * (uv + cosθ * n)
     r_out_parallel = -sqrt(abs(1 - (r_out_perp ⋅ r_out_perp))) * n
@@ -22,15 +23,16 @@ end
 
 function random_unit_vector()
     while true
-        p = Vector3(rand(3))
+        p = Vector4(rand(), rand(), rand(), 0)
         if 1e-160 < (p ⋅ p) ≤ 1
             return normalize(p)
         end
     end
 end
 
-function random_on_hemisphere(normal::Vector3{T}) where {T}
-    unitvector::Vector3 = random_unit_vector()
+function random_on_hemisphere(normal::Vector4{T}) where {T}
+
+    unitvector::Vector4 = random_unit_vector()
     return (unitvector ⋅ normal) > 0 ? unitvector : -unitvector
 end
 
@@ -48,8 +50,8 @@ function linear_to_γ(linear_component::T) where {T<:AbstractFloat}
 end
 
 struct Ray{T<:AbstractFloat}
-    origin::Point3{T}
-    direction::Vector3{T}
+    origin::Point4{T}
+    direction::Vector4{T}
 end
 
 (ray::Ray{T})(t::T) where {T} = ray.origin + t * ray.direction
@@ -57,11 +59,11 @@ end
 abstract type Material end
 
 struct Lambertian{T<:AbstractFloat} <: Material
-    albedo::Vector3{T}
+    albedo::Vector4{T}
 end
 
 struct Metal{T<:AbstractFloat} <: Material
-    albedo::Vector3{T}
+    albedo::Vector4{T}
     fuzz::T
 end
 
@@ -70,21 +72,21 @@ struct Dielectric{T<:AbstractFloat} <: Material
 end
 
 mutable struct HitRecord{T<:AbstractFloat}
-    p::Point3{T}
-    normal::Vector3{T}
+    p::Point4{T}
+    normal::Vector4{T}
     material::Material
     t::T
     front_face::Bool
 end
 
 function HitRecord{T}() where {T}
-    return HitRecord{T}(Point3{T}(), Vector3{T}(), Metal(Vector3{T}(), 0.5), T(0), false)
+    return HitRecord{T}(Point4{T}(), Vector4{T}(), Metal(Vector4{T}(), 0.5), T(0), false)
 end
 
 abstract type Hittable end
 
 struct Sphere{T<:AbstractFloat} <: Hittable where {T}
-    center::Point3{T}
+    center::Point4{T}
     radius::T
     material::Material
 end
@@ -137,7 +139,7 @@ end
 
 function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {T}
     if depth ≤ 0
-        return Vector3{T}()
+        return Vector4{T}()
     end
 
     record = HitRecord{T}()
@@ -151,7 +153,7 @@ function ray_color(hittable_list::HittableList, ray::Ray{T}, depth::Int) where {
     unit_vector = normalize(ray.direction)
     a = 0.5 * (unit_vector.y + 1)
 
-    return (1 - a) * Vector3(ones(T, 3)) + a * Vector3{T}(0.5, 0.7, 1.0)
+    return (1 - a) * Vector4{T}(1, 1, 1, 0) + a * Vector4{T}(0.5, 0.7, 1.0, 0)
 end
 
 function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
@@ -171,13 +173,14 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
         scattered_direction = record.normal
     end
 
+
     scattered = Ray(record.p, scattered_direction)
     attenuation = lambertian.albedo
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
 function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) where {T}
-    attenuation = Vector3(ones(T, 3))
+    attenuation = Vector4{T}(1, 1, 1, 0)
     relative_η = record.front_face ? 1 / dielectric.η : dielectric.η
     unit_direction = normalize(ray.direction)
     cosθ = min(-unit_direction ⋅ record.normal, 1.0)
@@ -205,18 +208,18 @@ struct Camera{T<:AbstractFloat}
     samples_per_pixel::Int
     max_depth::Int
     vfov::T
-    look_from::Point3{T}
-    look_at::Point3{T}
-    vup::Point3{T}
+    look_from::Point4{T}
+    look_at::Point4{T}
+    vup::Point4{T}
     aspect_ratio::T
-    center::Point3{T}
-    pixel00::Point3{T}
-    Δu::Vector3{T}
-    Δv::Vector3{T}
+    center::Point4{T}
+    pixel00::Point4{T}
+    Δu::Vector4{T}
+    Δv::Vector4{T}
     defocus_angle::T
     focus_distance::T
-    defocus_disk_u::Vector3{T}
-    defocus_disk_v::Vector3{T}
+    defocus_disk_u::Vector4{T}
+    defocus_disk_v::Vector4{T}
 end
 
 function Camera(
@@ -227,9 +230,9 @@ function Camera(
     vfov=20.0,
     defocus_angle=20.0,
     focus_distance=3.4,
-    look_from=Point3{T}(-2, 2, 1),
-    look_at=Point3{T}(0, 0, -1),
-    vup=Vector3{T}(0, 1, 0),
+    look_from=Point4{T}(-2, 2, 1, 0),
+    look_at=Point4{T}(0, 0, -1, 0),
+    vup=Vector4{T}(0, 1, 0, 0),
 ) where {T<:AbstractFloat}
     image_height = unsafe_trunc(Int, image_width / aspect_ratio)
     image_height = (image_height < 1) ? 1 : image_height
@@ -241,8 +244,8 @@ function Camera(
     center = look_from
 
     w = normalize(look_from - look_at)
-    u = normalize(vup × w)
-    v = w × u
+    u = Vector4(normalize(vup[1:3] × w[1:3])..., T(0))
+    v = Vector4((w[1:3] × u[1:3])..., T(0))
 
     defocus_radius = focus_distance * tan(deg2rad(defocus_angle / 2))
     defocus_disk_u = defocus_radius * u
@@ -291,11 +294,11 @@ function render(camera::Camera, world::HittableList)
 
     Threads.@threads for j in 1:(camera.image_height)
         for i in 1:(camera.image_width)
-            pixel_color = Vector3{Float64}()
+            pixel_color = Vector4{Float64}()
             for sample in 1:(camera.samples_per_pixel)
                 offset_x = rand() - 0.5
                 offset_y = rand() - 0.5
-                pixel_sample::Vector3 =
+                pixel_sample::Vector4 =
                     camera.pixel00 + (i + offset_x) * camera.Δu + (j + offset_y) * camera.Δv
                 ray_origin =
                     camera.defocus_angle ≤ 0 ? camera.center : defocus_disk_sample(camera)
@@ -306,7 +309,7 @@ function render(camera::Camera, world::HittableList)
             # tranform color to γ-space
             pixel_color = linear_to_γ.(pixel_color)
             pixel_color = unsafe_trunc.(UInt8, 256 * clamp.(pixel_color, 0.000, 0.999))
-            @inbounds image[i, j] = pixel_color
+            @inbounds image[i, j] = pixel_color[1:3]
         end
     end
     return image
