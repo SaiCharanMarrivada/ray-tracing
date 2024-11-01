@@ -52,6 +52,11 @@ end
 struct Ray{T<:AbstractFloat}
     origin::Point4{T}
     direction::Vector4{T}
+    time::T
+end
+
+function Ray(origin::Point4{T}, direction::Vector4{T}) where {T<:AbstractFloat}
+    return Ray(origin, direction, T(0))
 end
 
 (ray::Ray{T})(t::T) where {T} = ray.origin + t * ray.direction
@@ -86,15 +91,23 @@ end
 abstract type Hittable end
 
 struct Sphere{T<:AbstractFloat} <: Hittable where {T}
-    center::Point4{T}
+    center::Ray{T}
     radius::T
     material::Material
+end
+
+function Sphere(center::Point4{T}, radius::T, material::Material) where {T}
+    return Sphere(Ray(center, Vector4{T}()), radius, material)
+end
+
+function Sphere(center1::Point4{T}, center2::Point4{T}, radius::T, material::Material) where {T}
+    return Sphere(Ray(center1, center2 - center1), radius, material)
 end
 
 function hit(
     sphere::Sphere{T}, ray::Ray{T}, tmin::T, tmax::T, record::HitRecord{T}
 ) where {T}
-    oc = sphere.center - ray.origin
+    oc = sphere.center(ray.time) - ray.origin
     a = ray.direction ⋅ ray.direction
     h = ray.direction ⋅ oc
     c = (oc ⋅ oc) - sphere.radius^2
@@ -114,7 +127,7 @@ function hit(
 
     record.t = root
     record.p = ray(root)
-    outward_normal = (record.p - sphere.center) / sphere.radius
+    outward_normal = (record.p - sphere.center(ray.time)) / sphere.radius
     record.material = sphere.material
     record.front_face = (ray.direction ⋅ outward_normal) < 0
     record.normal = record.front_face ? outward_normal : -outward_normal
@@ -159,7 +172,7 @@ end
 function scatter(metal::Metal, ray::Ray{T}, record::HitRecord{T}) where {T}
     reflected = reflect(ray.direction, record.normal)
     reflected = normalize(reflected) + metal.fuzz * random_unit_vector()
-    scattered = Ray(record.p, reflected)
+    scattered = Ray(record.p, reflected, ray.time)
     attenuation = metal.albedo
     is_scattered = (scattered.direction ⋅ reflected > 0)
     return (scattered=scattered, attenuation=attenuation, is_scattered=is_scattered)
@@ -173,8 +186,7 @@ function scatter(lambertian::Lambertian, ray::Ray{T}, record::HitRecord{T}) wher
         scattered_direction = record.normal
     end
 
-
-    scattered = Ray(record.p, scattered_direction)
+    scattered = Ray(record.p, scattered_direction, ray.time)
     attenuation = lambertian.albedo
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
@@ -192,7 +204,7 @@ function scatter(dielectric::Dielectric, ray::Ray{T}, record::HitRecord{T}) wher
         direction = refract(unit_direction, record.normal, relative_η)
     end
 
-    scattered = Ray(record.p, direction)
+    scattered = Ray(record.p, direction, ray.time)
     return (scattered=scattered, attenuation=attenuation, is_scattered=true)
 end
 
@@ -302,7 +314,7 @@ function render(camera::Camera, world::HittableList)
                     camera.pixel00 + (i + offset_x) * camera.Δu + (j + offset_y) * camera.Δv
                 ray_origin =
                     camera.defocus_angle ≤ 0 ? camera.center : defocus_disk_sample(camera)
-                ray = Ray(ray_origin, pixel_sample - ray_origin)
+                ray = Ray(ray_origin, pixel_sample - ray_origin, rand())
                 pixel_color += ray_color(world, ray, camera.max_depth)
             end
             pixel_color /= camera.samples_per_pixel

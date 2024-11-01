@@ -16,7 +16,8 @@ function main()
                 if choose_material < 0.8
                     albedo = Vector4(rand(4)) .* Vector4(rand(4))
                     material = Lambertian(albedo)
-                    push!(world, Sphere(center, 0.2, material))
+                    center2 = center + Vector4{Float64}(0, 0.5 * rand(), 0, 0)
+                    push!(world, Sphere(center, center2, 0.2, material))
                 elseif choose_material < 0.95
                     albedo = Vector4(0.5rand(4) .+ 0.5)
                     fuzz = 0.5rand()
@@ -40,9 +41,9 @@ function main()
     push!(world, Sphere(Point4(4, 1, 0.0, 0.0), 1.0, material3))
 
     camera = Camera(
-        1200,
+        400,
         16.0 / 9.0;
-        samples_per_pixel=500,
+        samples_per_pixel=100,
         max_depth=50,
         vfov=20.0,
         defocus_angle=0.6,
