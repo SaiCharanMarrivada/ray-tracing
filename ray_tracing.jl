@@ -31,7 +31,6 @@ function random_unit_vector()
 end
 
 function random_on_hemisphere(normal::Vector4{T}) where {T}
-
     unitvector::Vector4 = random_unit_vector()
     return (unitvector ⋅ normal) > 0 ? unitvector : -unitvector
 end
